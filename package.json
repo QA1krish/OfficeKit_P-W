@@ -1,0 +1,33 @@
+{
+  "name": "officekithr-playwright-tests",
+  "version": "1.0.0",
+  "description": "Playwright TypeScript POM test suite for officekithr.net",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test --project=chromium",
+    "test:headed": "node run-tests.js --project=headed --sleep=3000",
+    "test:headed:slow": "node run-tests.js --project=headed --sleep=5000",
+    "test:headless": "playwright test --project=chromium",
+    "test:dashboard": "playwright test dashboard.spec.ts --project=chromium",
+    "test:dashboard:headed": "node run-dashboard-tests.js --project=headed --sleep=3000",
+    "test:dashboard:headed:slow": "node run-dashboard-tests.js --project=headed --sleep=5000",
+    "test:user-dashboard": "playwright test user-dashboard.spec.ts --project=chromium",
+    "test:user-dashboard:headed": "node run-user-dashboard-tests.js --project=headed --sleep=3000",
+    "test:user-dashboard:headed:slow": "node run-user-dashboard-tests.js --project=headed --sleep=5000",
+    "test:calendar": "playwright test calendar.spec.ts --project=chromium",
+    "test:calendar:headed": "node run-calendar-tests.js --project=headed --sleep=3000",
+    "test:calendar:headed:slow": "node run-calendar-tests.js --project=headed --sleep=5000",
+    "test:debug": "playwright test --debug",
+    "test:login": "playwright test --project=chromium --grep @login",
+    "report": "playwright show-report",
+    "install:browsers": "playwright install"
+  },
+  "keywords": ["playwright", "typescript", "pom", "officekithr"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^26.4.1",
+    "typescript": "^5.3.3"
+  }
+}
