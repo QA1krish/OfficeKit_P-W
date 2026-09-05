@@ -175,4 +175,137 @@ test.describe('OfficeKit HR Admin dashboard flows @dashboard', () => {
       });
     }
   });
+
+  test.describe('Flow 5 - Header actions @dashboard-header', () => {
+    test('opens notifications and displays Inbox management actions', async () => {
+      await test.step('Open the notification dialog', async () => {
+        await dashboardPage.openNotifications();
+        await expect(dashboardPage.notificationDialog).toBeVisible();
+      });
+
+      await test.step('Verify Inbox and notification management controls', async () => {
+        await expect(dashboardPage.notificationInboxTab).toBeVisible();
+        await expect(dashboardPage.notificationTodoTab).toBeVisible();
+        await expect(dashboardPage.clearNotificationsButton).toBeVisible();
+        await expect(dashboardPage.markAllNotificationsReadButton).toBeVisible();
+      });
+
+      await captureScreen(dashboardPage.page, 'admin-dashboard', 'notifications-inbox');
+    });
+
+    test('switches between notification tabs and closes the dialog', async () => {
+      await dashboardPage.openNotifications();
+
+      await test.step('Open My To Do List', async () => {
+        await dashboardPage.notificationTodoTab.click();
+        await expect(dashboardPage.notificationTodoTab).toHaveClass(/border-blue-600/);
+        await expect(dashboardPage.clearNotificationsButton).toBeHidden();
+        await expect(dashboardPage.markAllNotificationsReadButton).toBeHidden();
+      });
+
+      await test.step('Return to Inbox', async () => {
+        await dashboardPage.notificationInboxTab.click();
+        await expect(dashboardPage.notificationInboxTab).toHaveClass(/border-blue-600/);
+        await expect(dashboardPage.clearNotificationsButton).toBeVisible();
+      });
+
+      await test.step('Close the notification dialog', async () => {
+        await dashboardPage.closeNotifications();
+        await expect(dashboardPage.notificationDialog).toBeHidden();
+      });
+    });
+
+    test('opens the profile menu and displays all profile actions', async () => {
+      await dashboardPage.openProfileMenu();
+
+      await expect(dashboardPage.profileMenu).toBeVisible();
+      await expect(dashboardPage.profileMenu).toContainText('Faizan Lanka');
+      await expect(dashboardPage.profileMenu).toContainText('Chief Executive Officer');
+      await expect(dashboardPage.myProfileMenuItem).toBeVisible();
+      await expect(dashboardPage.changePasswordMenuItem).toBeVisible();
+      await expect(dashboardPage.logoutMenuItem).toBeVisible();
+
+      await captureScreen(dashboardPage.page, 'admin-dashboard', 'profile-menu');
+    });
+
+    test('My Profile opens personal information', async ({ page }) => {
+      await dashboardPage.openProfileMenu();
+      await dashboardPage.myProfileMenuItem.click();
+
+      await expect(page).toHaveURL(/\/my-profile\/personal-info(?:\/|$)/);
+      await expect(
+        page.getByText(`EMP/M2H/${admin.username}`, { exact: true }).first(),
+      ).toBeVisible();
+      await captureScreen(page, 'my-profile', 'admin-personal-information');
+    });
+
+    test('Change Password validates entries without updating the password', async ({ page }) => {
+      await dashboardPage.openProfileMenu();
+      await dashboardPage.changePasswordMenuItem.click();
+
+      await test.step('Verify the password form', async () => {
+        await expect(dashboardPage.changePasswordDialog).toBeVisible();
+        await expect(dashboardPage.currentPasswordInput).toBeVisible();
+        await expect(dashboardPage.newPasswordInput).toBeVisible();
+        await expect(dashboardPage.confirmPasswordInput).toBeVisible();
+        await expect(dashboardPage.cancelPasswordChangeButton).toBeVisible();
+        await expect(dashboardPage.updatePasswordButton).toBeVisible();
+      });
+
+      await test.step('Show and hide the current password', async () => {
+        await dashboardPage.changePasswordDialog
+          .getByRole('button', { name: 'Show password', exact: true })
+          .first()
+          .click();
+        await expect(dashboardPage.currentPasswordInput).toHaveAttribute('type', 'text');
+        await dashboardPage.changePasswordDialog
+          .getByRole('button', { name: 'Hide password', exact: true })
+          .first()
+          .click();
+        await expect(dashboardPage.currentPasswordInput).toHaveAttribute('type', 'password');
+      });
+
+      await test.step('Reject an empty form', async () => {
+        await dashboardPage.updatePasswordButton.click();
+        await expect(page.getByText('Please enter your current password.', { exact: true })).toBeVisible();
+      });
+
+      await test.step('Reject a weak new password', async () => {
+        await dashboardPage.currentPasswordInput.fill(admin.password);
+        await dashboardPage.newPasswordInput.fill('newpassword');
+        await dashboardPage.confirmPasswordInput.fill('newpassword');
+        await dashboardPage.updatePasswordButton.click();
+        await expect(
+          page.getByText(
+            'Password must be at least 8 characters long and include a number and a special character.',
+            { exact: true },
+          ),
+        ).toBeVisible();
+      });
+
+      await test.step('Reject non-matching passwords', async () => {
+        await dashboardPage.newPasswordInput.fill('Password@123!');
+        await dashboardPage.confirmPasswordInput.fill('Different@123!');
+        await dashboardPage.updatePasswordButton.click();
+        await expect(
+          page.getByText('New password and confirm password do not match.', { exact: true }),
+        ).toBeVisible();
+      });
+
+      await captureScreen(page, 'my-profile', 'change-password-validation');
+
+      await test.step('Cancel without changing the password', async () => {
+        await dashboardPage.cancelPasswordChangeButton.click();
+        await expect(dashboardPage.changePasswordDialog).toBeHidden();
+      });
+    });
+
+    test('Log Out returns to the login page', async ({ page }) => {
+      await dashboardPage.openProfileMenu();
+      await dashboardPage.logoutMenuItem.click();
+
+      await expect(page).toHaveURL(/\/login(?:\/|$)/);
+      await expect(page.locator('#login-company-code')).toBeVisible();
+    });
+  });
 });
