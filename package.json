@@ -17,6 +17,7 @@
     "test:calendar": "playwright test calendar.spec.ts --project=chromium",
     "test:calendar:headed": "node run-calendar-tests.js --project=headed --sleep=3000",
     "test:calendar:headed:slow": "node run-calendar-tests.js --project=headed --sleep=5000",
+    "test:separation": "playwright test separation.spec.ts --project=chromium",
     "test:debug": "playwright test --debug",
     "test:login": "playwright test --project=chromium --grep @login",
     "report": "playwright show-report",
