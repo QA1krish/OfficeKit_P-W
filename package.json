@@ -4,7 +4,7 @@
   "description": "Playwright TypeScript POM test suite for officekithr.net",
   "main": "index.js",
   "scripts": {
-    "test": "playwright test --project=chromium",
+    "test": "playwright test --project=chromium --grep-invert @mutating",
     "test:headed": "node run-tests.js --project=headed --sleep=3000",
     "test:headed:slow": "node run-tests.js --project=headed --sleep=5000",
     "test:headless": "playwright test --project=chromium",

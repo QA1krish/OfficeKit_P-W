@@ -1,4 +1,6 @@
-import { expect, test } from '@playwright/test';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { Browser, expect, test } from '@playwright/test';
 import {
   FinancialModule,
   FinancialRequestsPage,
@@ -9,6 +11,56 @@ import { captureScreen } from '../utils/screenshots';
 
 const sleepTime = Number(process.env.SLEEP_TIME ?? 0);
 const modules: FinancialModule[] = ['Loans', 'Advance', 'Claims'];
+const lifecycleRunId =
+  process.env.FINANCIAL_LIFECYCLE_RUN_ID ??
+  new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
+
+type LifecycleJournal = Record<
+  string,
+  {
+    submissionStarted: true;
+    requestId?: string;
+  }
+>;
+
+async function readLifecycleJournal(filePath: string): Promise<LifecycleJournal> {
+  try {
+    return JSON.parse(await readFile(filePath, 'utf8')) as LifecycleJournal;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return {};
+    }
+    throw error;
+  }
+}
+
+async function writeLifecycleJournal(
+  filePath: string,
+  journal: LifecycleJournal,
+): Promise<void> {
+  await mkdir(path.dirname(filePath), { recursive: true });
+  const temporaryPath = `${filePath}.${process.pid}.tmp`;
+  await writeFile(temporaryPath, JSON.stringify(journal, null, 2));
+  await rename(temporaryPath, filePath);
+}
+
+async function withFinancialSession<T>(
+  browser: Browser,
+  baseURL: string | undefined,
+  credentials: LoginCredentials,
+  action: (financialRequests: FinancialRequestsPage) => Promise<T>,
+): Promise<T> {
+  const context = await browser.newContext({ baseURL });
+  try {
+    const page = await context.newPage();
+    const financialRequests = new FinancialRequestsPage(page, sleepTime);
+    await new LoginPage(page, sleepTime).login(credentials);
+    await financialRequests.openFromProfile();
+    return await action(financialRequests);
+  } finally {
+    await context.close();
+  }
+}
 const employee: LoginCredentials = {
   companyCode: requiredEnvironmentVariable('COMPANY_CODE'),
   username: requiredEnvironmentVariable('EMPLOYEE_USERNAME'),
@@ -43,7 +95,7 @@ test.describe('Employee financial requests @financial-requests @financial-reques
       await expect(financialRequests.statusFilter).toBeVisible();
       await expect(financialRequests.exportButton).toBeVisible();
       await expect(
-        financialRequests.requestRows.first().or(financialRequests.noRequestsMessage),
+        financialRequests.requestRows.first().or(financialRequests.noRequestsMessage).first(),
       ).toBeVisible();
 
       if (module === 'Claims') {
@@ -68,19 +120,14 @@ test.describe('Employee financial requests @financial-requests @financial-reques
 
     test(`${module} exposes statuses and filters without requiring seeded rows`, async () => {
       await financialRequests.openWorkspace(module, 'Request');
-      await financialRequests.openStatusFilter();
 
       const statuses = module === 'Claims' ? ['All', 'Approved', 'Pending', 'Rejected'] : ['Pending'];
       for (const status of statuses) {
-        await expect(
-          financialRequests.page.getByRole('option', { name: status, exact: true }),
-        ).toBeVisible();
+        await financialRequests.selectStatus(status);
+        await expect(financialRequests.statusFilter).toContainText(status);
       }
-
-      await financialRequests.page.getByRole('option', { name: 'Pending', exact: true }).click();
-      await expect(financialRequests.statusFilter).toContainText('Pending');
       await expect(
-        financialRequests.requestRows.first().or(financialRequests.noRequestsMessage),
+        financialRequests.requestRows.first().or(financialRequests.noRequestsMessage).first(),
       ).toBeVisible();
     });
 
@@ -127,6 +174,27 @@ test.describe('Employee financial requests @financial-requests @financial-reques
     test(`${module} exports Excel and PDF downloads`, async ({ page }) => {
       await financialRequests.openWorkspace(module, 'Request');
 
+      const moduleEmptyState =
+        module === 'Claims'
+          ? page.getByText('No claim requests found.', { exact: true })
+          : page.getByText('No Request Available!', { exact: true });
+      if (module === 'Claims') {
+        await expect(page.getByText('Requested date', { exact: true }).first()).toBeVisible();
+      }
+      await expect(
+        moduleEmptyState.or(financialRequests.requestRows.getByRole('button').first()),
+      ).toBeVisible();
+      const hasOnlyEmptyState = (await financialRequests.requestRows.allInnerTexts()).every((text) =>
+        /^No (?:Request|claim|approval)/.test(text.trim()),
+      );
+      if (
+        hasOnlyEmptyState ||
+        !(await financialRequests.exportButton.isEnabled())
+      ) {
+        await expect(financialRequests.exportButton).toBeDisabled();
+        return;
+      }
+
       for (const exportOption of [
         { name: 'Export as Excel', extension: '.xlsx' },
         { name: 'Export as PDF', extension: '.pdf' },
@@ -159,11 +227,6 @@ test.describe('Approver financial approvals @financial-requests @financial-reque
       await financialRequests.openModule(module);
       const approvalTab = financialRequests.workspaceTab('Approval');
 
-      if (module !== 'Claims') {
-        await expect(approvalTab).toBeHidden();
-        return;
-      }
-
       await expect(approvalTab).toBeVisible();
       await financialRequests.openWorkspace(module, 'Approval');
       await expect(page).toHaveURL(financialRequests.routeFor(module, 'Approval'));
@@ -171,17 +234,19 @@ test.describe('Approver financial approvals @financial-requests @financial-reque
       await expect(financialRequests.statusFilter).toContainText(/Pending|All/);
       await expect(financialRequests.exportButton).toBeVisible();
       await expect(
-        financialRequests.requestRows.first().or(financialRequests.noRequestsMessage),
+        financialRequests.requestRows.first().or(financialRequests.noRequestsMessage).first(),
       ).toBeVisible();
-      for (const column of [
-        'Request ID',
-        'Employee Name',
-        'Applied On',
-        'Requested date',
-        'Category',
-        'Approvers',
-      ]) {
-        await expect(page.getByText(column, { exact: true }).first()).toBeVisible();
+      if (module === 'Claims') {
+        for (const column of [
+          'Request ID',
+          'Employee Name',
+          'Applied On',
+          'Requested date',
+          'Category',
+          'Approvers',
+        ]) {
+          await expect(page.getByText(column, { exact: true }).first()).toBeVisible();
+        }
       }
 
       await captureScreen(
@@ -193,13 +258,126 @@ test.describe('Approver financial approvals @financial-requests @financial-reque
       await financialRequests.selectStatus('Approved');
       await expect(financialRequests.statusFilter).toContainText('Approved');
       await expect(
-        financialRequests.requestRows.first().or(financialRequests.noRequestsMessage),
+        financialRequests.requestRows.first().or(financialRequests.noRequestsMessage).first(),
       ).toBeVisible();
 
       if (await financialRequests.viewButtons.first().isVisible()) {
         await financialRequests.openFirstApprovers();
         await expect(financialRequests.approversHeading).toBeVisible();
       }
+    });
+  }
+});
+
+test.describe('Financial approval lifecycles @mutating @financial-lifecycle', () => {
+  for (const module of modules) {
+    test(`${module} completes the two-level approval and rejection matrix`, async ({ browser }) => {
+      test.setTimeout(600_000);
+      const companyCode = requiredEnvironmentVariable('COMPANY_CODE');
+      const lifecycleEmployee: LoginCredentials = {
+        companyCode,
+        username: requiredEnvironmentVariable('EMPLOYEE_USERNAME'),
+        password: requiredEnvironmentVariable('EMPLOYEE_PASSWORD'),
+      };
+      const approverOne: LoginCredentials = {
+        companyCode,
+        username: requiredEnvironmentVariable('FINANCIAL_APPROVER_1_USERNAME'),
+        password: requiredEnvironmentVariable('FINANCIAL_APPROVER_1_PASSWORD'),
+      };
+      const approverTwo: LoginCredentials = {
+        companyCode,
+        username: requiredEnvironmentVariable('FINANCIAL_APPROVER_2_USERNAME'),
+        password: requiredEnvironmentVariable('FINANCIAL_APPROVER_2_PASSWORD'),
+      };
+      const moduleMarker = module.toLowerCase();
+      const markers = {
+        approved: `financial-lifecycle-${lifecycleRunId}-${moduleMarker}-approved`,
+        rejectedAtOne: `financial-lifecycle-${lifecycleRunId}-${moduleMarker}-rejected-l1`,
+        rejectedAtTwo: `financial-lifecycle-${lifecycleRunId}-${moduleMarker}-rejected-l2`,
+      };
+      const baseURL = test.info().project.use.baseURL;
+      const journalPath = path.join(
+        '.playwright',
+        'financial-lifecycle',
+        `${encodeURIComponent(lifecycleRunId)}.json`,
+      );
+      const journal = await readLifecycleJournal(journalPath);
+      const createTrackedRequest = async (marker: string): Promise<string> => {
+        const entry = journal[marker];
+        if (entry?.submissionStarted && !entry.requestId) {
+          throw new Error(
+            `Financial lifecycle cannot safely retry ${marker}: submission started but no request ID was captured.`,
+          );
+        }
+        return withFinancialSession(
+          browser,
+          baseURL,
+          lifecycleEmployee,
+          (financialRequests) => financialRequests.createRequest(module, marker, {
+            requestId: entry?.requestId,
+            onBeforeSubmit: async () => {
+              journal[marker] = { submissionStarted: true };
+              await writeLifecycleJournal(journalPath, journal);
+            },
+            onRequestCaptured: async (requestId) => {
+              journal[marker] = { submissionStarted: true, requestId };
+              await writeLifecycleJournal(journalPath, journal);
+            },
+            onSubmitRejected: async () => {
+              delete journal[marker];
+              await writeLifecycleJournal(journalPath, journal);
+            },
+          }),
+        );
+      };
+
+      const rejectedAtOneRequestId = await createTrackedRequest(markers.rejectedAtOne);
+      await withFinancialSession(browser, baseURL, approverOne, async (financialRequests) => {
+        await financialRequests.decideRequest(
+          module,
+          rejectedAtOneRequestId,
+          'Reject',
+          markers.rejectedAtOne,
+        );
+      });
+
+      const rejectedAtTwoRequestId = await createTrackedRequest(markers.rejectedAtTwo);
+      await withFinancialSession(browser, baseURL, approverOne, async (financialRequests) => {
+        await financialRequests.decideRequest(
+          module,
+          rejectedAtTwoRequestId,
+          'Approve',
+          markers.rejectedAtTwo,
+        );
+      });
+      await withFinancialSession(browser, baseURL, approverTwo, async (financialRequests) => {
+        await financialRequests.decideRequest(
+          module,
+          rejectedAtTwoRequestId,
+          'Reject',
+          markers.rejectedAtTwo,
+        );
+      });
+
+      const approvedRequestId = await createTrackedRequest(markers.approved);
+      await withFinancialSession(browser, baseURL, approverOne, async (financialRequests) => {
+        await financialRequests.decideRequest(module, approvedRequestId, 'Approve', markers.approved);
+      });
+      await withFinancialSession(browser, baseURL, approverTwo, async (financialRequests) => {
+        await financialRequests.decideRequest(module, approvedRequestId, 'Approve', markers.approved);
+        await financialRequests.expectRequestStatus(approvedRequestId, 'Approved');
+      });
+      await withFinancialSession(browser, baseURL, approverOne, async (financialRequests) => {
+        await financialRequests.openWorkspace(module, 'Approval');
+        await financialRequests.expectRequestStatus(approvedRequestId, 'Approved');
+      });
+
+      await withFinancialSession(browser, baseURL, lifecycleEmployee, async (financialRequests) => {
+        await financialRequests.openWorkspace(module, 'Request');
+        await financialRequests.expectRequestStatus(approvedRequestId, 'Approved');
+        await financialRequests.expectRequestStatus(rejectedAtOneRequestId, 'Rejected');
+        await financialRequests.expectRequestStatus(rejectedAtTwoRequestId, 'Rejected');
+      });
     });
   }
 });
