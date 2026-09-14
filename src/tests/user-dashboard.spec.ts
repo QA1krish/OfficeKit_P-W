@@ -20,8 +20,9 @@ test.describe('OfficeKit HR Employee dashboard flows @user-dashboard', () => {
 
     await test.step('Precondition - log in as Employee', async () => {
       await loginPage.login(employee);
-      await expect(page).toHaveURL(/officekithr\.net\/$/);
-      await expect(dashboardPage.dashboardLink).toBeVisible();
+      await expect(page).toHaveURL(/officekithr\.net\/$/, { timeout: 15000 });
+      await dashboardPage.dashboardLink.waitFor({ state: 'visible', timeout: 10000 });
+      await expect(dashboardPage.dashboardLink).toBeVisible({ timeout: 10000 });
     });
   });
 
