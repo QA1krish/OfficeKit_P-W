@@ -20,6 +20,6 @@
       "@utils/*": ["src/utils/*"]
     }
   },
-  "include": ["src/**/*.ts", "playwright.config.ts"],
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "webhook/**/*.ts", "unit/**/*.ts", "playwright.config.ts"],
   "exclude": ["node_modules", "dist"]
 }

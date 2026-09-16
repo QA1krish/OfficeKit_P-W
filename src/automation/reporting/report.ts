@@ -1,0 +1,16 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { QaSummary } from '../types';
+import { targetsFrom } from './results';
+
+export function escapeHtml(value: unknown): string { return String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]!); }
+function link(value?: string): string { return value && value !== 'unavailable' ? `<a href="${escapeHtml(value)}">${escapeHtml(value)}</a>` : escapeHtml(value); }
+export function renderHtml(summary: QaSummary): string {
+  const modules = summary.modules.map((item) => `<tr><td>${escapeHtml(item.module)}</td><td>${item.total}</td><td>${item.passed}</td><td>${item.failed}</td><td>${item.skipped}</td><td>${item.flaky}</td><td>${item.passPercentage}%</td><td>${item.failPercentage}%</td></tr>`).join('');
+  const tests = summary.tests.map((test) => `<tr><td>${escapeHtml(test.id)}</td><td>${escapeHtml(test.fullTitle)}</td><td>${escapeHtml(test.module)}</td><td>${escapeHtml(test.status)}</td><td>${test.durationMs}</td><td>${escapeHtml(test.error)}</td><td>${test.jiraUrl ? link(test.jiraUrl) : escapeHtml(test.jiraIssue)}</td><td>${escapeHtml(test.verificationStatus)}</td><td>${link(test.screenshot)}</td><td>${link(test.video)}</td><td>${link(test.trace)}</td></tr>`).join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><title>QA Summary</title><style>body{font:14px system-ui;margin:2rem;color:#17212b}table{border-collapse:collapse;width:100%;margin:1rem 0}th,td{border:1px solid #ccd3da;padding:.5rem;text-align:left;vertical-align:top}th{background:#edf2f5}</style></head><body><h1>${escapeHtml(summary.project)} QA Summary</h1><dl><dt>Result</dt><dd>${summary.overallResult}</dd><dt>Environment</dt><dd>${escapeHtml(summary.environment)}</dd><dt>Branch / Commit</dt><dd>${escapeHtml(summary.branch)} / ${escapeHtml(summary.commit)}</dd><dt>Started / Ended / Duration</dt><dd>${escapeHtml(summary.startedAt)} / ${escapeHtml(summary.endedAt)} / ${summary.durationMs} ms</dd><dt>Run / Report / Summary</dt><dd>${link(summary.runUrl)} ${link(summary.reportUrl)} ${link(summary.summaryUrl)}</dd></dl><p>Total ${summary.totals.total} | Passed ${summary.totals.passed} | Failed ${summary.totals.failed} | Skipped ${summary.totals.skipped} | Flaky ${summary.totals.flaky} | Pass ${summary.passPercentage}% | Fail ${summary.failPercentage}%</p><h2>Modules</h2><table><thead><tr><th>Module</th><th>Total</th><th>Passed</th><th>Failed</th><th>Skipped</th><th>Flaky</th><th>Pass %</th><th>Fail %</th></tr></thead><tbody>${modules}</tbody></table><h2>Tests</h2><table><thead><tr><th>Test case ID</th><th>Test case</th><th>Module</th><th>Status</th><th>Duration ms</th><th>Error</th><th>Jira issue</th><th>Verification</th><th>Screenshot</th><th>Video</th><th>Trace</th></tr></thead><tbody>${tests}</tbody></table></body></html>`;
+}
+export async function writeReports(summary: QaSummary, outputDir: string): Promise<void> {
+  await mkdir(outputDir, { recursive: true });
+  await Promise.all([writeFile(path.join(outputDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`), writeFile(path.join(outputDir, 'summary.html'), renderHtml(summary)), writeFile(path.join(outputDir, 'targets.json'), `${JSON.stringify(targetsFrom(summary), null, 2)}\n`)]);
+}

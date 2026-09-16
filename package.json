@@ -5,6 +5,16 @@
   "main": "index.js",
   "scripts": {
     "test": "playwright test --project=chromium --grep-invert @mutating",
+    "test:ci": "playwright test --project=chromium --grep-invert @mutating",
+    "test:list": "playwright test --project=chromium --list",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "tsx --test unit/**/*.test.ts",
+    "process:results": "tsx scripts/process-results.ts",
+    "process:jira": "tsx scripts/process-jira.ts",
+    "send:email": "tsx scripts/send-email.ts",
+    "webhook": "tsx webhook/jiraWebhook.ts",
+    "validate:config": "tsx scripts/validate-config.ts",
+    "validate:workflows": "tsx scripts/validate-workflows.ts",
     "test:headed": "node run-tests.js --project=headed --sleep=3000",
     "test:headed:slow": "node run-tests.js --project=headed --sleep=5000",
     "test:headless": "playwright test --project=chromium",
@@ -19,18 +29,32 @@
     "test:calendar:headed:slow": "node run-calendar-tests.js --project=headed --sleep=5000",
     "test:separation": "playwright test separation.spec.ts --project=chromium",
     "test:financial-requests": "playwright test financial-requests.spec.ts --project=chromium",
+    "test:my-profile": "playwright test --project=chromium --grep @my-profile --grep-invert @mutating",
+    "test:my-profile:p0": "playwright test --project=chromium --grep \"@my-profile.*\\[P0\\]|\\[P0\\].*@my-profile\"",
+    "test:my-profile:mutating": "playwright test --project=chromium --grep \"@my-profile.*@mutating|@mutating.*@my-profile\"",
     "test:debug": "playwright test --debug",
-    "test:login": "playwright test --project=chromium --grep @login",
+    "test:login": "tsx scripts/run-login.ts",
     "report": "playwright show-report",
     "install:browsers": "playwright install"
   },
-  "keywords": ["playwright", "typescript", "pom", "officekithr"],
+  "keywords": [
+    "playwright",
+    "typescript",
+    "pom",
+    "officekithr"
+  ],
   "author": "",
   "license": "ISC",
   "devDependencies": {
     "@playwright/test": "^1.40.0",
     "@types/node": "^26.4.1",
+    "@types/nodemailer": "^8.0.2",
     "dotenv": "^17.4.2",
+    "tsx": "^4.23.13",
     "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "nodemailer": "^10.0.10",
+    "yaml": "^2.9.1"
   }
 }

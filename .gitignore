@@ -9,3 +9,4 @@ blob-report
 .env.*
 !.env.example
 screenshots/
+reports/

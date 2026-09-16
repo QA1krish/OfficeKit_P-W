@@ -1,23 +1,30 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import { defineConfig, devices } from '@playwright/test';
+import { resolveBaseUrl, resolveTestEnvironment } from './src/config/environments';
+
+dotenv.config({ path: [`.env.${process.env.TEST_ENV ?? 'beta'}`, '.env'], quiet: true });
+const testEnvironment = resolveTestEnvironment();
 
 export default defineConfig({
   testDir: './src/tests',
+  outputDir: `test-results/${testEnvironment}`,
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: [
-    ['html', { open: 'never' }],
+    ['html', { open: 'never', outputFolder: `playwright-report/${testEnvironment}` }],
     ['list'],
+    ['json', { outputFile: 'test-results/results.json' }],
+    ...(process.env.CI ? ([['junit', { outputFile: 'test-results/junit.xml' }]] as const) : []),
   ],
   timeout: 60000,
   expect: {
     timeout: 10000,
   },
   use: {
-    baseURL: 'https://betatesting.officekithr.net/login',
-    trace: 'on-first-retry',
+    baseURL: resolveBaseUrl(),
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
     actionTimeout: 10000,

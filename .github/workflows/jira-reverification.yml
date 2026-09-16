@@ -1,21 +1,32 @@
-name: Playwright Tests
+name: Jira Re-verification
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
     inputs:
+      jira_issue:
+        description: Existing Jira issue to update
+        required: true
+        type: string
+      test_case_id:
+        description: Deterministic Playwright test case ID
+        required: false
+        type: string
+      module:
+        description: Module tag without @
+        required: false
+        type: string
+      target_mode:
+        description: Verification scope
+        required: true
+        default: test
+        type: choice
+        options: [test, module, suite, full]
       test_environment:
         description: Environment to test
         required: true
         default: beta
         type: choice
-        options:
-          - beta
-          - staging
-          - production
+        options: [beta, staging, production]
       base_url:
         description: Required URL override for staging; optional for other environments
         required: false
@@ -24,12 +35,8 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: playwright-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -40,12 +47,18 @@ jobs:
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
       EMPLOYEE_USERNAME: ${{ secrets.EMPLOYEE_USERNAME }}
       EMPLOYEE_PASSWORD: ${{ secrets.EMPLOYEE_PASSWORD }}
+      TARGET_MODE: ${{ inputs.target_mode || vars.JIRA_REVIEW_RERUN_MODE || 'test' }}
+      JIRA_REVIEW_RERUN_MODE: ${{ vars.JIRA_REVIEW_RERUN_MODE || 'test' }}
+      TEST_CASE_ID: ${{ inputs.test_case_id }}
+      MODULE: ${{ inputs.module }}
+      JIRA_ISSUE: ${{ inputs.jira_issue }}
       JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
       JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
       JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
       JIRA_PROJECT_KEY: ${{ secrets.JIRA_PROJECT_KEY }}
       JIRA_DEFAULT_ASSIGNEE: ${{ secrets.JIRA_DEFAULT_ASSIGNEE }}
       JIRA_EVIDENCE_MAX_BYTES: ${{ vars.JIRA_EVIDENCE_MAX_BYTES || '5000000' }}
+      JIRA_PASS_TRANSITION: ${{ vars.JIRA_PASS_TRANSITION || '' }}
       SMTP_HOST: ${{ secrets.SMTP_HOST }}
       SMTP_PORT: ${{ vars.SMTP_PORT || '587' }}
       SMTP_SECURE: ${{ vars.SMTP_SECURE || 'false' }}
@@ -55,103 +68,52 @@ jobs:
       TESTER_EMAIL: ${{ vars.TESTER_EMAIL }}
       PROJECT_MANAGER_EMAIL: ${{ vars.PROJECT_MANAGER_EMAIL }}
       DEVELOPER_EMAIL: ${{ vars.DEVELOPER_EMAIL }}
-      JIRA_REVIEW_RERUN_MODE: ${{ vars.JIRA_REVIEW_RERUN_MODE || 'test' }}
       SLEEP_TIME: 0
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Chromium
-        id: browser_install
-        continue-on-error: true
-        run: npx playwright install --with-deps chromium
-
+      - run: npm ci
       - name: Validate automation configuration
         id: configuration
         continue-on-error: true
         run: npm run validate:config -- runtime
-
-      - name: Type-check test framework
-        id: typecheck
-        if: always()
+      - name: Install Chromium
+        id: browser_install
         continue-on-error: true
-        run: npm run typecheck
-
-      - name: Verify test collection
-        id: collection
-        if: always()
-        continue-on-error: true
-        run: npm run test:list
-
-      - name: Run Playwright tests
-        if: always()
+        run: npx playwright install --with-deps chromium
+      - name: Run fresh targeted verification
         id: playwright
+        if: always()
         continue-on-error: true
-        run: npm run test:ci
-
+        run: npx tsx scripts/run-target.ts
       - name: Generate QA summary
         if: always()
         continue-on-error: true
         run: npm run process:results
-
-      - name: Process Jira defects
-        if: always() && env.JIRA_API_TOKEN != '' && env.JIRA_PROJECT_KEY != '' && env.JIRA_DEFAULT_ASSIGNEE != ''
+      - name: Update existing Jira issue
+        if: always() && env.JIRA_API_TOKEN != ''
         continue-on-error: true
         run: npm run process:jira
-
-      - name: Send execution email
+      - name: Send verification email
         if: always() && env.SMTP_HOST != ''
         continue-on-error: true
         run: npm run send:email
-
-      - name: Upload Playwright report
+      - name: Upload verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
-          path: playwright-report/
-          if-no-files-found: ignore
-          retention-days: 14
-
-      - name: Upload module screenshots
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: module-screenshots
-          path: screenshots/
-          if-no-files-found: ignore
-          retention-days: 14
-
-      - name: Upload failure evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: test-results/
-          if-no-files-found: ignore
-          retention-days: 14
-
-      - name: Upload QA summaries
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: qa-summaries
-          path: reports/
+          name: jira-verification-${{ inputs.jira_issue }}
+          path: |
+            reports/
+            playwright-report/
+            test-results/
           if-no-files-found: warn
           retention-days: 14
-
       - name: Restore core automation result
-        if: always() && (steps.browser_install.outcome == 'failure' || steps.configuration.outcome == 'failure' || steps.typecheck.outcome == 'failure' || steps.collection.outcome == 'failure' || steps.playwright.outcome == 'failure' || steps.unit_test.outcome == 'failure')
+        if: always() && (steps.configuration.outcome == 'failure' || steps.browser_install.outcome == 'failure' || steps.playwright.outcome == 'failure' || steps.unit_test.outcome == 'failure')
         run: exit 1
 
       - name: Run unit tests
