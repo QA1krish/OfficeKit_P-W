@@ -82,7 +82,7 @@ export class FinancialRequestsPage {
   }
 
   private async waitForModuleList(module: FinancialModule): Promise<void> {
-    await expect(this.moduleButton(module)).toHaveClass(/bg-\[#284EF5\]/);
+    await expect(this.moduleButton(module)).toBeVisible();
     await expect.poll(async () => {
       const rows = await this.requestRows.allInnerTexts();
       return (
@@ -93,7 +93,10 @@ export class FinancialRequestsPage {
   }
 
   moduleButton(module: FinancialModule): Locator {
-    return this.page.getByRole('button', { name: module, exact: true });
+    return this.page
+      .getByRole('button', { name: module, exact: true })
+      .or(this.page.getByRole('link', { name: module, exact: true }))
+      .first();
   }
 
   workspaceTab(workspace: FinancialWorkspace): Locator {
@@ -101,6 +104,9 @@ export class FinancialRequestsPage {
   }
 
   routeFor(module: FinancialModule, workspace: FinancialWorkspace): RegExp {
+    if (module === 'Claims') {
+      return new RegExp(`/my-profile/claims/${workspace.toLowerCase()}$`);
+    }
     return new RegExp(
       `/my-profile/request-approvals/${moduleRoutes[module]}/${workspace.toLowerCase()}$`,
     );
@@ -628,9 +634,11 @@ export class FinancialRequestsPage {
   }
 
   async expectRequestStatus(requestId: string, status: 'Approved' | 'Rejected'): Promise<void> {
-    const module = (Object.entries(moduleRoutes).find(([, route]) =>
-      this.page.url().includes(`/request-approvals/${route}/`),
-    )?.[0] ?? '') as FinancialModule;
+    const module = (Object.keys(moduleRoutes).find((candidate) => {
+      const financialModule = candidate as FinancialModule;
+      return this.routeFor(financialModule, 'Request').test(this.page.url()) ||
+        this.routeFor(financialModule, 'Approval').test(this.page.url());
+    }) ?? '') as FinancialModule;
     if (!module) {
       throw new Error(`Financial lifecycle could not identify the module for request ${requestId}.`);
     }

@@ -21,8 +21,9 @@ export class DashboardPage {
   readonly clearNotificationsButton: Locator;
   readonly markAllNotificationsReadButton: Locator;
   readonly greeting: Locator;
-  readonly pmsLink: Locator;
-  readonly taskLink: Locator;
+  readonly performLink: Locator;
+  readonly taskButton: Locator;
+  readonly taskTimesheetLink: Locator;
   readonly attendanceSummary: Locator;
   readonly requestsAndApprovals: Locator;
   readonly myTeam: Locator;
@@ -72,8 +73,9 @@ export class DashboardPage {
       exact: true,
     });
     this.greeting = page.getByRole('heading', { name: /Good (Morning|Afternoon|Evening), Faizan/ });
-    this.pmsLink = page.getByRole('link', { name: 'PMS', exact: true });
-    this.taskLink = page.getByRole('link', { name: 'Task', exact: true });
+    this.performLink = page.getByRole('link', { name: 'Perform', exact: true });
+    this.taskButton = page.getByRole('button', { name: 'Task', exact: true });
+    this.taskTimesheetLink = page.getByRole('link', { name: 'Task & Timesheet', exact: true });
     this.attendanceSummary = page.getByText('Attendance Summary', { exact: true });
     this.requestsAndApprovals = page.getByText('Request & Approvals', { exact: true }).first();
     this.myTeam = page.getByText('My Team', { exact: true }).first();
@@ -104,13 +106,14 @@ export class DashboardPage {
     );
   }
 
-  async clickPms(): Promise<void> {
-    await this.pmsLink.click();
+  async clickPerform(): Promise<void> {
+    await this.performLink.click();
     await this.pause();
   }
 
   async clickTask(): Promise<void> {
-    await this.taskLink.click();
+    await this.taskButton.click();
+    await this.taskTimesheetLink.click();
     await this.pause();
   }
 

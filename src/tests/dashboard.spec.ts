@@ -34,8 +34,8 @@ test.describe('OfficeKit HR Admin dashboard flows @dashboard', () => {
 
       await test.step('Verify direct navigation links', async () => {
         await expect(dashboardPage.dashboardLink).toBeVisible();
-        await expect(dashboardPage.pmsLink).toBeVisible();
-        await expect(dashboardPage.taskLink).toBeVisible();
+        await expect(dashboardPage.performLink).toBeVisible();
+        await expect(dashboardPage.taskButton).toBeVisible();
       });
 
       await test.step('Verify expandable sidebar modules', async () => {
@@ -126,9 +126,9 @@ test.describe('OfficeKit HR Admin dashboard flows @dashboard', () => {
   });
 
   test.describe('Flow 3 - Sidebar navigation @dashboard-navigation', () => {
-    test('PMS opens the Performance Management page', async ({ page }) => {
-      await test.step('Click PMS', async () => {
-        await dashboardPage.clickPms();
+    test('Perform opens the Performance Management page', async ({ page }) => {
+      await test.step('Click Perform', async () => {
+        await dashboardPage.clickPerform();
       });
       await expect(page).toHaveURL(/\/pms(?:\/|$)/);
       await captureScreen(page, 'pms', 'admin-pms-page');

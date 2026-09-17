@@ -36,8 +36,8 @@ test.describe('OfficeKit HR Employee dashboard flows @user-dashboard', () => {
 
       await test.step('Verify direct navigation links', async () => {
         await expect(dashboardPage.dashboardLink).toBeVisible();
-        await expect(dashboardPage.pmsLink).toBeVisible();
-        await expect(dashboardPage.taskLink).toBeVisible();
+        await expect(dashboardPage.performLink).toBeVisible();
+        await expect(dashboardPage.taskButton).toBeVisible();
       });
 
       await test.step('Verify Employee sidebar permissions', async () => {
@@ -46,13 +46,13 @@ test.describe('OfficeKit HR Employee dashboard flows @user-dashboard', () => {
           'Company',
           'Attendance',
           'Leave',
-          'TalentHub',
           'Settings',
           'AI Insight',
         ];
         for (const module of modules) {
           await expect(dashboardPage.sidebarButton(module)).toBeVisible();
         }
+        await expect(dashboardPage.sidebarButton('TalentHub')).toHaveCount(0);
       });
 
       await captureScreen(dashboardPage.page, 'employee-dashboard', 'shell-and-permissions');
@@ -102,8 +102,8 @@ test.describe('OfficeKit HR Employee dashboard flows @user-dashboard', () => {
   });
 
   test.describe('Flow 3 - Employee sidebar navigation @user-dashboard-navigation', () => {
-    test('PMS opens the Performance Management page', async ({ page }) => {
-      await dashboardPage.clickPms();
+    test('Perform opens the Performance Management page', async ({ page }) => {
+      await dashboardPage.clickPerform();
       await expect(page).toHaveURL(/\/pms(?:\/|$)/);
       await captureScreen(page, 'pms', 'employee-pms-page');
     });

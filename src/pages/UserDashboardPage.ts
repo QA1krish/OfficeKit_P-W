@@ -2,8 +2,9 @@ import { Locator, Page } from '@playwright/test';
 
 export class UserDashboardPage {
   readonly dashboardLink: Locator;
-  readonly pmsLink: Locator;
-  readonly taskLink: Locator;
+  readonly performLink: Locator;
+  readonly taskButton: Locator;
+  readonly taskTimesheetLink: Locator;
   readonly greeting: Locator;
   readonly userProfileButton: Locator;
   readonly totalHours: Locator;
@@ -17,8 +18,9 @@ export class UserDashboardPage {
     private readonly sleepTime = 0,
   ) {
     this.dashboardLink = page.getByRole('link', { name: 'Dashboard', exact: true });
-    this.pmsLink = page.getByRole('link', { name: 'PMS', exact: true });
-    this.taskLink = page.getByRole('link', { name: 'Task', exact: true });
+    this.performLink = page.getByRole('link', { name: 'Perform', exact: true });
+    this.taskButton = page.getByRole('button', { name: 'Task', exact: true });
+    this.taskTimesheetLink = page.getByRole('link', { name: 'Task & Timesheet', exact: true });
     this.greeting = page.getByRole('heading', { name: /Good (Morning|Afternoon|Evening), Athul/ });
     this.userProfileButton = page.getByRole('button', { name: /Athul Krishn/ });
     this.totalHours = page.getByText('Total Hours', { exact: true });
@@ -48,13 +50,14 @@ export class UserDashboardPage {
     );
   }
 
-  async clickPms(): Promise<void> {
-    await this.pmsLink.click();
+  async clickPerform(): Promise<void> {
+    await this.performLink.click();
     await this.pause();
   }
 
   async clickTask(): Promise<void> {
-    await this.taskLink.click();
+    await this.taskButton.click();
+    await this.taskTimesheetLink.click();
     await this.pause();
   }
 

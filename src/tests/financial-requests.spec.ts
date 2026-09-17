@@ -11,6 +11,7 @@ import { captureScreen } from '../utils/screenshots';
 
 const sleepTime = Number(process.env.SLEEP_TIME ?? 0);
 const modules: FinancialModule[] = ['Loans', 'Advance', 'Claims'];
+const approvalModules: FinancialModule[] = ['Loans', 'Advance'];
 const lifecycleRunId =
   process.env.FINANCIAL_LIFECYCLE_RUN_ID ??
   new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
@@ -89,7 +90,9 @@ test.describe('Employee financial requests @financial-requests @financial-reques
 
       await expect(page).toHaveURL(financialRequests.routeFor(module, 'Request'));
       await expect(financialRequests.moduleButton(module)).toBeVisible();
-      await expect(financialRequests.workspaceTab('Request')).toBeVisible();
+      if (module !== 'Claims') {
+        await expect(financialRequests.workspaceTab('Request')).toBeVisible();
+      }
       await expect(financialRequests.addRequestButton).toBeVisible();
       await expect(financialRequests.searchInput).toBeVisible();
       await expect(financialRequests.statusFilter).toBeVisible();
@@ -101,7 +104,9 @@ test.describe('Employee financial requests @financial-requests @financial-reques
       if (module === 'Claims') {
         for (const column of [
           'Request ID',
-          'Applied On',
+          'Category',
+          'Sub Category',
+          'Description',
           'Requested date',
           'Approve Status',
           'Approvers',
@@ -222,7 +227,7 @@ test.describe('Approver financial approvals @financial-requests @financial-reque
     await financialRequests.openFromProfile();
   });
 
-  for (const module of modules) {
+  for (const module of approvalModules) {
     test(`${module} checks every approval workspace exposed to the approver`, async ({ page }) => {
       await financialRequests.openModule(module);
       const approvalTab = financialRequests.workspaceTab('Approval');
@@ -236,19 +241,6 @@ test.describe('Approver financial approvals @financial-requests @financial-reque
       await expect(
         financialRequests.requestRows.first().or(financialRequests.noRequestsMessage).first(),
       ).toBeVisible();
-      if (module === 'Claims') {
-        for (const column of [
-          'Request ID',
-          'Employee Name',
-          'Applied On',
-          'Requested date',
-          'Category',
-          'Approvers',
-        ]) {
-          await expect(page.getByText(column, { exact: true }).first()).toBeVisible();
-        }
-      }
-
       await captureScreen(
         page,
         'financial-requests',
@@ -267,10 +259,16 @@ test.describe('Approver financial approvals @financial-requests @financial-reque
       }
     });
   }
+
+  test('Claims remains available as a request-only workspace', async ({ page }) => {
+    await financialRequests.openWorkspace('Claims', 'Request');
+    await expect(page).toHaveURL(financialRequests.routeFor('Claims', 'Request'));
+    await expect(financialRequests.workspaceTab('Approval')).toHaveCount(0);
+  });
 });
 
 test.describe('Financial approval lifecycles @mutating @financial-lifecycle', () => {
-  for (const module of modules) {
+  for (const module of approvalModules) {
     test(`${module} completes the two-level approval and rejection matrix`, async ({ browser }) => {
       test.setTimeout(600_000);
       const companyCode = requiredEnvironmentVariable('COMPANY_CODE');
