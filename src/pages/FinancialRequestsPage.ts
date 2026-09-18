@@ -93,10 +93,12 @@ export class FinancialRequestsPage {
   }
 
   moduleButton(module: FinancialModule): Locator {
-    return this.page
+    const accessibleModule = this.page
       .getByRole('button', { name: module, exact: true })
-      .or(this.page.getByRole('link', { name: module, exact: true }))
-      .first();
+      .or(this.page.getByRole('link', { name: module, exact: true }));
+    return module === 'Claims'
+      ? accessibleModule.or(this.page.getByText(module, { exact: true }).last()).first()
+      : accessibleModule.first();
   }
 
   workspaceTab(workspace: FinancialWorkspace): Locator {
@@ -137,7 +139,17 @@ export class FinancialRequestsPage {
         { timeout: 15000 },
       )
       .catch(() => undefined);
-    await this.moduleButton(module).click();
+    if (module === 'Claims') {
+      const directLink = this.page.getByRole('link', { name: module, exact: true });
+      if (await directLink.isVisible()) {
+        await directLink.click();
+      } else {
+        await this.page.getByText(module, { exact: true }).last().click();
+        await this.page.locator('a[href="/my-profile/claims/request"]').click();
+      }
+    } else {
+      await this.moduleButton(module).click();
+    }
     await this.page.waitForURL(this.routeFor(module, 'Request'));
     await listResponse;
     await this.searchInput.waitFor({ state: 'visible' });

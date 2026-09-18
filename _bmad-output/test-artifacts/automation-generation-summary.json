@@ -1,0 +1,30 @@
+{
+  "detected_stack": "frontend",
+  "execution_mode": "subagent",
+  "total_tests": 14,
+  "api_tests": 0,
+  "e2e_tests": 14,
+  "test_files": 4,
+  "shared_infrastructure_files": 3,
+  "priority_coverage": {
+    "P0": 2,
+    "P1": 10,
+    "P2": 2,
+    "P3": 0
+  },
+  "dry_run": {
+    "passed": 12,
+    "failed": 1,
+    "confirmed_defect": "Forms and Policies document download returns HTTP 404 and starts no download"
+  },
+  "mutating": {
+    "total_tests": 1,
+    "passed": 1,
+    "restored": true,
+    "language_lifecycle": {
+      "status": "blocked",
+      "visible_baseline_restored": true,
+      "confirmed_defect": "Deleted Language choices cannot be re-added even though the API returns success"
+    }
+  }
+}

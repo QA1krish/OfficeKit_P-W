@@ -7,3 +7,6 @@
 - source_spec: none
   summary: Complete destructive Separation submission, approval/rejection, and withdrawal lifecycle automation.
   evidence: Separation can deactivate the configured Employee and must execute only after all financial and administrative scenarios are complete.
+- source_spec: `_bmad-output/implementation-artifacts/spec-my-profile-language-lifecycle.md`
+  summary: Preserve My Profile mutation screenshots and browser artifacts in a durable evidence store.
+  evidence: Current screenshot and test-results paths may be ignored or replaced; confirm retention requirements and a target store before treating them as durable review evidence.

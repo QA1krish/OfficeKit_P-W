@@ -11,7 +11,8 @@ import { captureScreen } from '../utils/screenshots';
 
 const sleepTime = Number(process.env.SLEEP_TIME ?? 0);
 const modules: FinancialModule[] = ['Loans', 'Advance', 'Claims'];
-const approvalModules: FinancialModule[] = ['Loans', 'Advance'];
+const approvalModules: FinancialModule[] = ['Loans', 'Advance', 'Claims'];
+const lifecycleModules: FinancialModule[] = ['Loans', 'Advance'];
 const lifecycleRunId =
   process.env.FINANCIAL_LIFECYCLE_RUN_ID ??
   new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14);
@@ -260,15 +261,10 @@ test.describe('Approver financial approvals @financial-requests @financial-reque
     });
   }
 
-  test('Claims remains available as a request-only workspace', async ({ page }) => {
-    await financialRequests.openWorkspace('Claims', 'Request');
-    await expect(page).toHaveURL(financialRequests.routeFor('Claims', 'Request'));
-    await expect(financialRequests.workspaceTab('Approval')).toHaveCount(0);
-  });
 });
 
 test.describe('Financial approval lifecycles @mutating @financial-lifecycle', () => {
-  for (const module of approvalModules) {
+  for (const module of lifecycleModules) {
     test(`${module} completes the two-level approval and rejection matrix`, async ({ browser }) => {
       test.setTimeout(600_000);
       const companyCode = requiredEnvironmentVariable('COMPANY_CODE');
